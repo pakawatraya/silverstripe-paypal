@@ -1,0 +1,8 @@
+---
+Name: paypalroutes
+After: framework/routes#coreroutes
+---
+Director:
+  rules:
+    'home/paypal//$Action': 'SS_PayPal_Controller'
+    'paypal//$Action': 'SS_PayPal_Controller'
