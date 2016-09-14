@@ -1,0 +1,29 @@
+<?php
+class FindACoachPageControllerExtension extends DataExtension {
+  
+  private static $allowed_actions = [];
+
+  public function onBeforeInit() {
+    global $moduleSections;
+
+    $cssFiles = Session::get('SFModuleCSSFiles');
+
+    if(!$cssFiles) {
+      $cssFiles = [];
+    }
+
+    $cssFiles[] = $moduleSections . '/css/find-a-coach.css';
+
+    Session::set('SFModuleCSSFiles', $cssFiles);
+
+    $jsFiles = Session::get('SFModuleJSFiles');
+
+    if(!$jsFiles) {
+      $jsFiles = [];
+    }
+
+    $jsFiles[] = $moduleSections . '/js/find-a-coach.js';
+
+    Session::set('SFModuleJSFiles', $jsFiles);
+  }
+}
