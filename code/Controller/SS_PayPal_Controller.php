@@ -17,32 +17,36 @@ class SS_PayPal_Controller extends Page_Controller {
   }
 
   public function test() {
-    Session::clear('SS_PayPal_Order');
-
-    $address = [
-      'Company' => 'StripeForge',
-      'FirstName' => 'Benedikt',
-      'Surname' => 'Hofstätter',
-      'Street' => 'Musterweg',
-      'StreetNr' => '777',
-      'City' => 'Neumarkt i.d.Opf.',
-      'Zip' => '92318',
-      'CountryCode' => 'DE'
-    ];
-    
-    $item = [
-      'Title' => 'Produktname',
-      'Amount' => '10',
-      'Sku' => 'Artikelnummer',
-      'Price' => '99.95'
-    ];
-
-    $paypal = SS_PayPal::create();
-    $paypal->addItem($item);
-    $paypal->setAddress($address);
-    $paypal->setShippingCost(4.9);
-    $paypal->setInvoiceID('asdasd');
-    $paypal->start();
+    if(Director::isDev() && Permission::check(['ADMIN'])) {
+      Session::clear('SS_PayPal_Order');
+  
+      $address = [
+        'Company' => 'StripeForge',
+        'FirstName' => 'Benedikt',
+        'Surname' => 'Hofstätter',
+        'Street' => 'Musterweg',
+        'StreetNr' => '777',
+        'City' => 'Neumarkt i.d.Opf.',
+        'Zip' => '92318',
+        'CountryCode' => 'DE'
+      ];
+      
+      $item = [
+        'Title' => 'Produktname',
+        'Amount' => '10',
+        'Sku' => 'Artikelnummer',
+        'Price' => '99.95'
+      ];
+  
+      $paypal = SS_PayPal::create();
+      $paypal->addItem($item);
+      $paypal->setAddress($address);
+      $paypal->setShippingCost(4.9);
+      $paypal->setInvoiceID('asdasd');
+      $paypal->start();
+    } else {
+      Security::permissionFailure();
+    }
   }
 
   public function receive() {
