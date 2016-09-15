@@ -139,8 +139,11 @@ class SS_PayPal extends DataObject implements HiddenClass {
         ->setName($item['Title'])
         ->setCurrency('EUR')
         ->setQuantity($item['Amount'])
-        ->setSku($item['Sku'])
         ->setPrice($item['Price']);
+      
+      if(isset($item['Sku'])) {
+        $ppItem->setSku($item['Sku']);
+      }
 
       $ppItems[] = $ppItem;
       
@@ -150,13 +153,19 @@ class SS_PayPal extends DataObject implements HiddenClass {
 
     // - add shipping address
     $address = $this->shippingAddress;
+    $recipient = $address['FirstName'] . ' ' . $address['Surname'];
+    
+    if(isset($address['Company'])) {
+       $recpient .= ' ' . $address['Company'];
+    }
+    
     $shippingAddress = new ShippingAddress();
     $shippingAddress
       ->setCity($address['City'])
       ->setCountryCode($address['CountryCode'])
       ->setPostalCode($address['Zip'])
       ->setLine1($address['Street'] . ' ' . $address['StreetNr'])
-      ->setRecipientName($address['FirstName'] . ' ' . $address['Surname'] . ' ' . $address['Company']);
+      ->setRecipientName($recipient);
 
     // - add items + shipping address
     $itemList = new ItemList();
