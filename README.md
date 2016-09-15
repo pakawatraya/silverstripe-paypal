@@ -16,4 +16,6 @@ SS_PayPal:
 - validierung
 - dokumentation
 - aufräumen
+- email bestätigungen für käufer & verkäufer?
+- in db speichern?
 - extras?
