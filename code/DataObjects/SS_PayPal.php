@@ -26,7 +26,7 @@ class SS_PayPal extends DataObject implements HiddenClass {
     $this->items = [];
     $this->shippingCost = 0;
     $this->shopTitle = SiteConfig::current_site_config()->Title;
-    $this->successMessage = '<strong>Wir bedanken uns für Ihren Einkauf.</stong>';
+    $this->successMessage = 'Wir bedanken uns für Ihren Einkauf.';
     
     $config = $this->config();
 
@@ -121,7 +121,8 @@ class SS_PayPal extends DataObject implements HiddenClass {
 
   public function submitOrder() {
     $order = Session::get('SS_PayPal_Order');
-    $controller = Controller::curr();
+    $currController = Controller::curr();
+    $paypalController = SS_PayPal_Controller::create();
     $apiContext = $this->apiContext;
     $order['Status'] = 'pending';
 
@@ -185,7 +186,7 @@ class SS_PayPal extends DataObject implements HiddenClass {
       ->setInvoiceNumber($this->invoiceID);
 
     // - set redirect
-    $baseUrl = rtrim(Director::absoluteBaseURL(), '/') . $controller->Link();
+    $baseUrl = rtrim(Director::absoluteBaseURL(), '/') . $paypalController->Link();
     $redirectUrls = new RedirectUrls();
     $redirectUrls
       ->setReturnUrl($baseUrl . 'receive?success=true')
@@ -207,13 +208,13 @@ class SS_PayPal extends DataObject implements HiddenClass {
       $order['StatusCode'] = $response->name;
       $order['Message'] = $response->message;
       Session::set('SS_PayPal_Order', $order);
-      return $controller->redirectBack();
+      return $currController->redirect($paypalController->Link());
     }
 
     $approvalUrl = $payment->getApprovalLink();
     $order['PaymentLink'] = $approvalUrl;
     Session::set('SS_PayPal_Order', $order);
-    return $controller->redirect($approvalUrl);
+    return $currController->redirect($approvalUrl);
   }
 
   public function executePaymet($v, $order) {
