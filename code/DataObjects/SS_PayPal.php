@@ -20,11 +20,26 @@ class SS_PayPal extends DataObject implements HiddenClass {
   private $shippingCost;
   private $invoiceID;
   private $shopTitle;
+  private $successMessage;
 
   function __construct() {
     $this->items = [];
+    $this->shippingCost = 0;
     $this->shopTitle = SiteConfig::current_site_config()->Title;
+    $this->successMessage = '<strong>Wir bedanken uns für Ihren Einkauf.</stong>';
+    
     $config = $this->config();
+
+    Session::set('SS_PayPal_Order', [
+      'Status' => false,
+      'StatusCode' => false,
+      'PayerID' => false,
+      'PaymentID' => false,
+      'Message' => false,
+      'PaymentLink' => false,
+      'PaymentDate' => false,
+      'SS_PayPal_Object' => false
+    ]);
 
     if(Director::isLive()) {
       $clientID = $config->client_id;
@@ -68,7 +83,8 @@ class SS_PayPal extends DataObject implements HiddenClass {
     ////   'Company' => 'StripeForge',
     ////   'FirstName' => 'Benedikt',
     ////   'Surname' => 'Hofstätter',
-    ////   'StreetWithNr' => 'Musterweg 123',
+    ////   'Street' => 'Musterweg',
+    ////   'StreetNr' => '777',
     ////   'City' => 'Neumarkt i.d.Opf.',
     ////   'Zip' => '92318',
     ////   'CountryCode' => 'DE'
@@ -90,47 +106,24 @@ class SS_PayPal extends DataObject implements HiddenClass {
     $this->invoiceID = $id;
   }
 
-  public function processPayment($order) {
-    $siteConfig = SiteConfig::current_site_config();
-    $apiContext = $this->apiContext;
-    $controller = SS_PayPal_Controller::create();
+  public function setSuccessMessage($msg) {
+    //// $msg = '<strong>Wir bedanken uns für Ihren Einkauf</stong><br>...';
+    $this->successMessage = $msg;
+  }
 
-    $r = $controller->request;
-    $v = $r->getVars();
-    
-    if(isset($v['success']) && $order->PaymentTransactionID) {
+  public function start() {
+    $order = Session::get('SS_PayPal_Order');
+    $order['SS_PayPal_Object'] = $this;
+    Session::set('SS_PayPal_Order', $order);
 
-      if($order->PaymentTransaction()->Status == 'pending' || $order->PaymentTransaction()->Status == 'failed') {
-        if($v['success'] == 'true') {
-          $paymentTransaction = $order->PaymentTransaction();
-          $paymentTransaction->PayerID = $v['PayerID'];
-          $paymentTransaction->PaymentID = $v['paymentId'];
-          $paymentTransaction->write();
-
-          $this->executePaymet($v);
-        } else {
-          $paymentTransaction = $order->PaymentTransaction();
-          $paymentTransaction->Status = 'failed';
-          $paymentTransaction->Message = '<strong>Sie haben den Bezahlvorgang abgebrochen.</strong> Bitte starten Sie diesen erneut.';
-          $paymentTransaction->write();
-          $controller->redirectBack();
-        }
-      }
-    } else if(!isset($v['success']) && !$order->PaymentTransactionID) {
-      $this->submitOrder();
-    }
+    $this->submitOrder();
   }
 
   public function submitOrder() {
-    $controller = SS_PayPal_Controller::create();
+    $order = Session::get('SS_PayPal_Order');
+    $controller = Controller::curr();
     $apiContext = $this->apiContext;
-
-    // $paymentTransaction = PaymentTransaction_Paypal::create();
-    // $paymentTransaction->Status = 'pending';
-    // $paymentTransaction->write();
-
-    // $order->PaymentTransactionID = $paymentTransaction->ID;
-    // $order->write();
+    $order['Status'] = 'pending';
 
     $payer = new Payer();
     $payer->setPaymentMethod('paypal');
@@ -158,16 +151,17 @@ class SS_PayPal extends DataObject implements HiddenClass {
     $address = $this->shippingAddress;
     $shippingAddress = new ShippingAddress();
     $shippingAddress
-      ->setCity($address['City']);
-      ->setCountryCode($address['CountryCode']);
-      ->setPostalCode($address['Zip']);
-      ->setLine1($address['StreetWithNr']);
+      ->setCity($address['City'])
+      ->setCountryCode($address['CountryCode'])
+      ->setPostalCode($address['Zip'])
+      ->setLine1($address['Street'] . ' ' . $address['StreetNr'])
       ->setRecipientName($address['FirstName'] . ' ' . $address['Surname'] . ' ' . $address['Company']);
 
     // - add items + shipping address
     $itemList = new ItemList();
-    $itemList->setItems($ppItems);
-    $itemList->setShippingAddress($shippingAddress);
+    $itemList
+      ->setItems($ppItems)
+      ->setShippingAddress($shippingAddress);
 
     // - set costs
     $details = new Details();
@@ -194,8 +188,8 @@ class SS_PayPal extends DataObject implements HiddenClass {
     $baseUrl = rtrim(Director::absoluteBaseURL(), '/') . $controller->Link();
     $redirectUrls = new RedirectUrls();
     $redirectUrls
-      ->setReturnUrl("$baseUrl/?success=true")
-      ->setCancelUrl("$baseUrl/?success=false");
+      ->setReturnUrl($baseUrl . 'receive?success=true')
+      ->setCancelUrl($baseUrl . 'receive?success=false');
 
     // - create payment
     $payment = new Payment();
@@ -205,34 +199,27 @@ class SS_PayPal extends DataObject implements HiddenClass {
       ->setTransactions([$transaction]);
 
     $request = clone $payment;
-
     try {
       $payment->create($apiContext);
-    } catch (Exception $ex) {
-      echo 'error line 210'; die();
-      // $response = json_decode($ex->getData());
-      // $paymentTransaction->Status = 'failed';
-      // $paymentTransaction->Code = $response->name;
-      // $paymentTransaction->Message = $response->message;
-      // $paymentTransaction->Log = '~|-3-|~' . $ex->getData();
-      // $paymentTransaction->write();
-      // return $controller->redirectBack();
+    } catch(Exception $ex) {
+      $response = json_decode($ex->getData());
+      $order['Status'] = 'failed';
+      $order['StatusCode'] = $response->name;
+      $order['Message'] = $response->message;
+      Session::set('SS_PayPal_Order', $order);
+      return $controller->redirectBack();
     }
 
     $approvalUrl = $payment->getApprovalLink();
-    
-    // $paymentTransaction->PaymentLink = $approvalUrl;
-    // $paymentTransaction->write();
-
+    $order['PaymentLink'] = $approvalUrl;
+    Session::set('SS_PayPal_Order', $order);
     return $controller->redirect($approvalUrl);
   }
 
-  public function executePaymet($v) {
-    $controller = SS_PayPal_Controller::create();
-    $siteConfig = SiteConfig::current_site_config();
+  public function executePaymet($v, $order) {
+    $controller = Controller::curr();
     $apiContext = $this->apiContext;
 
-    // $paymentTransaction = $order->PaymentTransaction();
     $paymentError = false;
     $paymentId = $v['paymentId'];
     $payment = Payment::get($paymentId, $apiContext);
@@ -242,44 +229,32 @@ class SS_PayPal extends DataObject implements HiddenClass {
 
     try {
       $result = $payment->execute($execution, $apiContext);
-      
       try {
         $payment = Payment::get($paymentId, $apiContext);
       } catch(Exception $ex) {
-        echo 'error 249'; die();
-        // $response = json_decode($ex->getData());
-        // $paymentTransaction->Status = 'failed';
-        // $paymentTransaction->Code = $response->name;
-        // $paymentTransaction->Message = $response->message;
-        // $paymentTransaction->Log = '~|-2-|~' . $ex->getData();
-        // $paymentTransaction->write();
+        $response = json_decode($ex->getData());
+        $order['Status'] = 'failed';
+        $order['StatusCode'] = $response->name;
+        $order['Message'] = $response->message;
+        Session::set('SS_PayPal_Order', $order);
         $paymentError = true;
       }
     } catch(Exception $ex) {
-      echo 'error 259'; die();
-      // $response = json_decode($ex->getData());
-      // $paymentTransaction->Status = 'failed';
-      // $paymentTransaction->Code = $response->name;
-      // $paymentTransaction->Message = $response->message;
-      // $paymentTransaction->Log = '~|-3-|~' . $ex->getData();
-      // $paymentTransaction->write();
+      $response = json_decode($ex->getData());
+      $order['Status'] = 'failed';
+      $order['StatusCode'] = $response->name;
+      $order['Message'] = $response->message;
+      Session::set('SS_PayPal_Order', $order);
       $paymentError = true;
     }
 
     if(!$paymentError) {
-      // $cart = ShoppingCart::findOrMake();
-      // $cart->OpenPayment = false;
-      // $cart->write();
-
-      // $paymentTransaction->Status = 'success';
-      // $paymentTransaction->Name = 'VERIFIED';
-      // $paymentTransaction->write();
-
-      // $order->Payed = true;
-      // $order->PaymentDate = date('Y-m-d H:i:s');
-      // $order->write();
+        $order['Status'] = 'success';
+        $order['PaymentDate'] = date('Y-m-d H:i:s');
+        $order['Message'] = $this->successMessage;
+        Session::set('SS_PayPal_Order', $order);
     }
 
-    return $controller->redirectBack();
+    return $controller->redirect($controller->Link());
   }
 }

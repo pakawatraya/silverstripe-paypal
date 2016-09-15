@@ -1,7 +1,6 @@
-DO NOT USE!
-UNDER DEVELOPMENT!
+# DO NOT USE! UNDER DEVELOPMENT!
 
-put this inside mysite/config.yml
+mysite/config.yml
 
 ```yml
 SS_PayPal:
@@ -13,4 +12,8 @@ SS_PayPal:
 
 # Todo
 
-- get homepage link in yml
+- dauerhafte benachrichtigung wenn zahlvorgang nicht abgeschlossen
+- validierung
+- dokumentation
+- aufräumen
+- extras?
