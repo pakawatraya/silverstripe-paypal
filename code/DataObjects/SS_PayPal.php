@@ -21,11 +21,17 @@ class SS_PayPal extends DataObject implements HiddenClass {
   private $invoiceID;
   private $shopTitle;
   private $successMessage;
+  private $emails;
 
   function __construct() {
     $this->items = [];
+    $this->emails = [];
     $this->shippingCost = 0;
-    $this->shopTitle = SiteConfig::current_site_config()->Title;
+
+    if(isset($_SERVER['REDIRECT_URL']) && $_SERVER['REDIRECT_URL'] !== '/dev/build') {
+      $this->shopTitle = SiteConfig::current_site_config()->Title;
+    }
+
     $this->successMessage = 'Wir bedanken uns für Ihren Einkauf.';
     
     $config = $this->config();
@@ -106,9 +112,35 @@ class SS_PayPal extends DataObject implements HiddenClass {
     $this->invoiceID = $id;
   }
 
+  public function setShopTitle($title) {
+    //// $title = 'Mein Demo-Shop';
+    $this->shopTitle = $title;
+  }
+
   public function setSuccessMessage($msg) {
     //// $msg = '<strong>Wir bedanken uns für Ihren Einkauf</stong><br>...';
     $this->successMessage = $msg;
+  }
+
+  public function setEmail($email) {
+    //// $email = Email::create(...);
+    //// $email = [
+    ////  Email::create(...),
+    ////  Email::create(...)
+    //// ];
+    if(is_array($email)) {
+      $emails = $this->emails;
+      $emails = array_merge($emails, $email);
+    } else {
+      $emails = $this->emails;
+      $emails[] = $email;
+    }
+
+    $this->emails = $emails;
+  }
+
+  public function getEmails() {
+    return $this->emails;
   }
 
   public function start() {

@@ -77,6 +77,11 @@ class SS_PayPal_Controller extends Page_Controller {
   public function index() {
     $data = Session::get('SS_PayPal_Order');
     if($data['Status'] == 'success') {
+      $emails = Session::get('SS_PayPal_Order')['SS_PayPal_Object']->getEmails();
+      foreach($emails as $email) {
+        $email->send();
+      }
+
       Session::clear('SS_PayPal_Order');
       $data['Title'] = 'Vielen Dank für Ihre Zahlung';
     } else if($data['Status'] == 'failed') {
